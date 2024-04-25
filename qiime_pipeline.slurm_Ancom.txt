@@ -1,0 +1,71 @@
+#!/bin/sh -l
+
+#SBATCH --nodes=12                   ##number of requested nodes (a node is a group of CPUs)
+#SBATCH -n 20		         ##number of requested CPUs
+#SBATCH --time=020:00:00             ##time requested
+#SBATCH --job-name qiime_pipeline.slurm_Ancom ##name of job
+#SBATCH -A microbiome                 ##name of the queue you are using. Could be scholar or microbiome if you are on snyder
+
+#########################################################################
+
+echo "Start time"
+date +"%d %B %Y %H:%M:%S"
+
+#step 1, cd into the proper directory. This directory must already exist
+
+cd $RCAC_SCRATCH
+cd FeedlotStudy
+
+
+pwd
+
+#step 2, Load Modules
+
+echo "loading bioinfo"
+module load bioinfo
+
+echo "loading qiime2-2023.9"
+module load Qiime/2-2023.9
+
+#step 3, Run the code you want
+
+echo "Differential Abundance Nasal Samples"
+
+qiime feature-table filter-samples \
+  --i-table table.qza \
+  --m-metadata-file ProjectMetadata.txt \
+  --p-where "[Tissue]='Nasal'" \
+  --o-filtered-table Nasal-table.qza
+
+qiime composition add-pseudocount \
+  --i-table Nasal-table.qza \
+  --o-composition-table comp-Nasal-table.qza
+
+qiime composition ancom \
+  --i-table comp-Nasal-table.qza \
+  --m-metadata-file ProjectMetadata.txt \
+  --m-metadata-column Treatment \
+  --o-visualization ancom-TreatmentNasal.qzv
+
+qiime taxa collapse \
+  --i-table Nasal-table.qza \
+  --i-taxonomy taxonomy.qza \
+  --p-level 6 \
+  --o-collapsed-table TreatmentNasal-table-l6.qza
+
+qiime composition add-pseudocount \
+  --i-table TreatmentNasal-table-l6.qza \
+  --o-composition-table comp-Nasal-table-l6.qza
+
+qiime composition ancom \
+  --i-table comp-Nasal-table-l6.qza \
+  --m-metadata-file ProjectMetadata.txt \
+  --m-metadata-column Treatment \
+  --o-visualization l6-ancom-TissueNasal.qzv
+
+
+
+echo "End time"
+date +"%d %B %Y %H:%M:%S"
+
+#to run: sbatch qiime_pipeline.slurm6
