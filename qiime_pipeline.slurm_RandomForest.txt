@@ -1,0 +1,88 @@
+#!/bin/sh -l
+
+#SBATCH --nodes=12                   ##number of requested nodes (a node is a group of CPUs)
+#SBATCH -n 20		         ##number of requested CPUs
+#SBATCH --time=012:00:00             ##time requested
+#SBATCH --job-name qiime_pipeline.slurm6 ##name of job
+#SBATCH -A microbiome                 ##name of the queue you are using. Could be scholar or microbiome if you are on snyder
+
+#########################################################################
+
+echo "Start time"
+date +"%d %B %Y %H:%M:%S"
+
+#step 1, cd into the proper directory. This directory must already exist
+
+cd $RCAC_SCRATCH
+cd FeedlotStudy
+
+
+pwd
+
+#step 2, Load Modules
+
+echo "loading bioinfo"
+module load bioinfo
+
+echo "loading qiime2-2023.9"
+module load Qiime/2-2023.9
+
+#step 3, Run the code you want
+
+echo "Random Forest"
+
+qiime sample-classifier classify-samples \
+  --i-table table.qza \
+  --m-metadata-file ProjectMetadata.txt \
+  --m-metadata-column Treatment \
+  --p-optimize-feature-selection \
+  --p-parameter-tuning \
+  --p-estimator RandomForestClassifier \
+  --p-n-estimators 20 \
+  --p-random-state 123 \
+  --output-dir FeedlotProject-classifier
+
+qiime metadata tabulate \
+  --m-input-file FeedlotProject-classifier/predictions.qza \
+  --o-visualization FeedlotProject-classifier/predictions.qzv
+
+qiime metadata tabulate \
+  --m-input-file FeedlotProject-classifier/probabilities.qza \
+  --o-visualization FeedlotProject-classifier/probabilities.qzv
+
+qiime metadata tabulate \
+  --m-input-file FeedlotProject-classifier/feature_importance.qza \
+  --o-visualization FeedlotProject-classifier/feature_importance.qzv
+
+qiime feature-table filter-features \
+  --i-table table.qza \
+  --m-metadata-file FeedlotProject-classifier/feature_importance.qza \
+  --o-filtered-table FeedlotProject-classifier/important-feature-table.qza
+
+qiime sample-classifier heatmap \
+  --i-table table.qza \
+  --i-importance FeedlotProject-classifier/feature_importance.qza \
+  --m-sample-metadata-file ProjectMetadata.txt \
+  --m-sample-metadata-column Treatment \
+  --p-group-samples \
+  --p-feature-count 30 \
+  --o-filtered-table FeedlotProject-classifier/important-feature-table-top-30.qza \
+  --o-heatmap FeedlotProject-classifier/important-feature-heatmap.qzv
+
+qiime sample-classifier heatmap \
+--i-table table.qza \
+--i-importance FeedlotProject-classifier/feature_importance.qza  \
+--m-sample-metadata-file ProjectMetadata.txt  \
+--m-sample-metadata-column Treatment \
+--m-feature-metadata-file taxonomy.qza \
+--m-feature-metadata-column Taxon \
+--p-group-samples  \
+--p-feature-count 30  \
+--o-filtered-table FeedlotProject-classifier/important-feature-table-taxonomy-top-30.qza \
+--o-heatmap FeedlotProject-classifier/important-feature-heatmap-taxonomy.qzv
+
+echo "End time"
+date +"%d %B %Y %H:%M:%S"
+
+#to run: sbatch qiime_pipeline.slurm6
+
